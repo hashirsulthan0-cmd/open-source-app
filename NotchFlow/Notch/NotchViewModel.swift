@@ -35,6 +35,8 @@ final class NotchViewModel: ObservableObject {
     @Published private(set) var state: State = .closed
     @Published var selectedTab: Tab = .clipboard
     @Published var geometry: NotchGeometry
+    /// True while something is being dragged over the notch.
+    @Published var isDropTargeted = false
 
     init(geometry: NotchGeometry) {
         self.geometry = geometry

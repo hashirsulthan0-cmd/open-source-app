@@ -6,6 +6,8 @@ import AppKit
 @main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let clipboard = ClipboardManager()
+    private let shelf = FileTrayManager()
     private var notchController: NotchController?
     private var statusItem: NSStatusItem?
 
@@ -22,7 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        let controller = NotchController()
+        clipboard.start()
+
+        let controller = NotchController(clipboard: clipboard, shelf: shelf)
         controller.start()
         notchController = controller
 
@@ -31,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         notchController?.stop()
+        clipboard.stop()
+        shelf.save()
     }
 
     // MARK: - Menu bar icon

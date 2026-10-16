@@ -7,6 +7,7 @@ protocol NotchContainerViewDelegate: AnyObject {
     func containerMouseExited()
     func containerDragEntered()
     func containerDragExited()
+    func containerPerformDrop(_ pasteboard: NSPasteboard) -> Bool
 }
 
 /// The panel's root view. It hosts the SwiftUI interface and reports hover and
@@ -68,12 +69,15 @@ final class NotchContainerView: NSView {
     // MARK: - Drag and drop
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        // Ignore drags that start inside NotchFlow (like dragging a card out of the shelf),
+        // so an item can't be dropped back onto itself.
+        guard sender.draggingSource == nil else { return [] }
         delegate?.containerDragEntered()
         return .copy
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        .copy
+        sender.draggingSource == nil ? .copy : []
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
@@ -84,9 +88,8 @@ final class NotchContainerView: NSView {
         delegate?.containerDragExited()
     }
 
-    // Dropped items are stored by the shelf, which arrives in Phase 2.
-    // Until then the drop is declined and the item returns to where it came from.
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        false
+        guard sender.draggingSource == nil else { return false }
+        return delegate?.containerPerformDrop(sender.draggingPasteboard) ?? false
     }
 }

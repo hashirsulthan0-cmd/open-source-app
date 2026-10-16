@@ -4,6 +4,8 @@ import SwiftUI
 /// between closed and open, and the expanded content.
 struct NotchRootView: View {
     @ObservedObject var viewModel: NotchViewModel
+    let clipboard: ClipboardManager
+    let shelf: FileTrayManager
 
     var body: some View {
         let isOpen = viewModel.isOpen
@@ -14,7 +16,7 @@ struct NotchRootView: View {
 
         ZStack(alignment: .top) {
             if isOpen {
-                NotchExpandedView(viewModel: viewModel)
+                NotchExpandedView(viewModel: viewModel, clipboard: clipboard, shelf: shelf)
                     .transition(
                         .asymmetric(
                             insertion: .opacity
@@ -45,6 +47,8 @@ struct NotchRootView: View {
 /// the right), with the selected tab's content below.
 struct NotchExpandedView: View {
     @ObservedObject var viewModel: NotchViewModel
+    let clipboard: ClipboardManager
+    let shelf: FileTrayManager
 
     var body: some View {
         let geometry = viewModel.geometry
@@ -59,8 +63,22 @@ struct NotchExpandedView: View {
             }
             .frame(height: topBandHeight)
 
-            NotchTabContent(tab: viewModel.selectedTab)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Group {
+                switch viewModel.selectedTab {
+                case .clipboard:
+                    ClipboardView(clipboard: clipboard)
+                case .shelf:
+                    ShelfView(shelf: shelf, isDropTargeted: viewModel.isDropTargeted)
+                case .nowPlaying:
+                    NotchEmptyState(
+                        symbol: "music.note",
+                        title: "Now Playing",
+                        message: "Music, battery and microphone status will appear here."
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .transition(.opacity)
         }
         .padding(.horizontal, NotchMetrics.openTopRadius + 14)
         .padding(.bottom, 16)
@@ -103,42 +121,6 @@ private struct NotchClock: View {
             Text(context.date, format: .dateTime.hour().minute())
                 .font(.system(size: 13, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.white.opacity(0.85))
-        }
-    }
-}
-
-/// Content for each tab. The real clipboard, shelf and media views replace these
-/// empty states in the next phases.
-private struct NotchTabContent: View {
-    let tab: NotchViewModel.Tab
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: tab.symbol)
-                .font(.system(size: 26, weight: .regular))
-                .foregroundStyle(.white.opacity(0.35))
-            Text(tab.title)
-                .font(.system(size: 14, weight: .semibold))
-            Text(message)
-                .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.5))
-                .multilineTextAlignment(.center)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.05))
-        }
-        .id(tab)
-        .transition(.opacity)
-    }
-
-    private var message: String {
-        switch tab {
-        case .clipboard: "Your clipboard history will appear here."
-        case .shelf: "Drag files or links here to keep them handy."
-        case .nowPlaying: "Music, battery and microphone status will appear here."
         }
     }
 }

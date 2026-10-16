@@ -8,6 +8,8 @@ import AppKit
 @MainActor
 final class NotchController: NSObject {
     private let viewModel = NotchViewModel(geometry: .zero)
+    private let clipboard: ClipboardManager
+    private let shelf: FileTrayManager
     private var panel: NotchPanel?
     private var eventMonitors: [Any] = []
 
@@ -25,6 +27,12 @@ final class NotchController: NSObject {
     private var openedManually = false
     private var cursorVisitedSinceManualOpen = false
 
+    init(clipboard: ClipboardManager, shelf: FileTrayManager) {
+        self.clipboard = clipboard
+        self.shelf = shelf
+        super.init()
+    }
+
     // MARK: - Lifecycle
 
     func start() {
@@ -34,7 +42,7 @@ final class NotchController: NSObject {
         let panel = NotchPanel(contentRect: viewModel.geometry.closedPanelFrame)
         let container = NotchContainerView(
             frame: NSRect(origin: .zero, size: panel.frame.size),
-            rootView: NotchRootView(viewModel: viewModel)
+            rootView: NotchRootView(viewModel: viewModel, clipboard: clipboard, shelf: shelf)
         )
         container.delegate = self
         panel.contentView = container
@@ -96,14 +104,21 @@ final class NotchController: NSObject {
         guard viewModel.isOpen else { return }
 
         viewModel.setState(.closed)
-        panel?.resignKey()
+        viewModel.isDropTargeted = false
 
         // Shrink the window back to notch size once the close animation has played,
         // so the transparent area around it stops covering anything.
         collapseTask = Task { [weak self] in
             try? await Task.sleep(for: NotchMetrics.collapseDuration)
-            guard let self, !Task.isCancelled, !self.viewModel.isOpen else { return }
-            self.panel?.setFrame(self.viewModel.geometry.closedPanelFrame, display: true)
+            guard let self, !Task.isCancelled, !self.viewModel.isOpen, let panel = self.panel else { return }
+            panel.setFrame(self.viewModel.geometry.closedPanelFrame, display: true)
+            // If the search field had keyboard focus, typing would keep going to the
+            // hidden notch. Re-ordering the window hands focus back to the app underneath.
+            if panel.isKeyWindow {
+                panel.makeFirstResponder(nil)
+                panel.orderOut(nil)
+                panel.orderFrontRegardless()
+            }
         }
     }
 
@@ -246,10 +261,19 @@ extension NotchController: NotchContainerViewDelegate {
     func containerDragEntered() {
         isDraggingContent = true
         viewModel.selectedTab = .shelf
+        viewModel.isDropTargeted = true
         open()
     }
 
     func containerDragExited() {
+        viewModel.isDropTargeted = false
         updateForCursor(at: NSEvent.mouseLocation)
+    }
+
+    func containerPerformDrop(_ pasteboard: NSPasteboard) -> Bool {
+        viewModel.isDropTargeted = false
+        isDraggingContent = false
+        viewModel.selectedTab = .shelf
+        return shelf.add(from: pasteboard)
     }
 }
