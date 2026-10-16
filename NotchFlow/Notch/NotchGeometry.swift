@@ -115,8 +115,24 @@ struct NotchGeometry: Equatable {
         )
     }
 
-    /// Moving the cursor into this area opens the notch.
+    /// The generous area around the notch. Used for drags (so there's always somewhere to
+    /// drop) and to decide whether the cursor is still "at" an open notch.
     var hoverZone: NSRect {
         notchRect.insetBy(dx: -NotchMetrics.hoverMargin, dy: -NotchMetrics.hoverMargin)
+    }
+
+    /// Where resting the cursor opens the notch, for each sensitivity.
+    func openZone(for sensitivity: HoverSensitivity) -> NSRect {
+        switch sensitivity {
+        case .precise:
+            // The middle half of the notch, where the camera is. The extra height above
+            // covers the cursor pinned against the very top edge of the screen.
+            let inset = notchRect.width * 0.25
+            return NSRect(x: notchRect.minX + inset, y: notchRect.minY, width: notchRect.width - inset * 2, height: notchRect.height + 4)
+        case .balanced:
+            return NSRect(x: notchRect.minX, y: notchRect.minY, width: notchRect.width, height: notchRect.height + 4)
+        case .relaxed:
+            return hoverZone
+        }
     }
 }

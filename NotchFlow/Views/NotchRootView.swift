@@ -4,6 +4,7 @@ import SwiftUI
 /// between closed and open, and the expanded content.
 struct NotchRootView: View {
     @ObservedObject var viewModel: NotchViewModel
+    @ObservedObject var settings: SettingsStore
     let clipboard: ClipboardManager
     let shelf: FileTrayManager
     let hud: SystemHUDManager
@@ -48,19 +49,25 @@ struct NotchRootView: View {
             alignment: .top
         )
         .background {
-            // Pure black at the top so it blends with the camera notch, easing into a
-            // slightly lifted dark grey at the bottom for a glassy depth when open.
-            LinearGradient(
-                colors: [.black, isOpen ? Color(white: 0.07) : .black],
-                startPoint: .top,
-                endPoint: .bottom
+            NotchGlassBackground(
+                isOpen: isOpen,
+                topBandHeight: max(viewModel.geometry.notchRect.height, 32)
             )
         }
         .clipShape(shape)
         .overlay {
-            // A faint highlight along the edge, visible only when open.
-            shape
-                .stroke(Color.white.opacity(isOpen ? 0.08 : 0), lineWidth: 1)
+            // A glossy rim: brighter along the bottom curve, where light catches the edge.
+            shape.stroke(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(isOpen ? 0.04 : 0),
+                        Color.white.opacity(isOpen ? 0.08 + 0.22 * settings.glassIntensity : 0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: 1
+            )
         }
         .background {
             shape
@@ -69,6 +76,8 @@ struct NotchRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.colorScheme, .dark)
+        .environment(\.glassIntensity, settings.glassIntensity)
+        .animation(.easeOut(duration: 0.2), value: settings.glassIntensity)
     }
 }
 
@@ -148,6 +157,7 @@ private struct NotchTabBar: View {
     @Binding var selection: NotchViewModel.Tab
 
     @Namespace private var highlight
+    @Environment(\.glassIntensity) private var intensity
 
     var body: some View {
         HStack(spacing: 4) {
@@ -164,11 +174,12 @@ private struct NotchTabBar: View {
                         .background {
                             if isSelected {
                                 Capsule()
-                                    .fill(Color.white.opacity(0.16))
+                                    .fill(Color.white.opacity(0.16 + 0.74 * intensity))
+                                    .shadow(color: .white.opacity(0.25 * intensity), radius: 4)
                                     .matchedGeometryEffect(id: "selectedTab", in: highlight)
                             }
                         }
-                        .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.55))
+                        .foregroundStyle(isSelected ? (intensity > 0.45 ? Color.black : Color.white) : Color.white.opacity(0.55))
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)

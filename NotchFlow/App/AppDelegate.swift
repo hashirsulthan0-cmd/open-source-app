@@ -13,7 +13,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hud = SystemHUDManager()
     private let nowPlaying = NowPlayingManager()
     private let scanner = MenuBarScanner()
-    private lazy var settingsWindow = SettingsWindowController(settings: settings, clipboard: clipboard, scanner: scanner)
+    private lazy var settingsWindow = SettingsWindowController(
+        settings: settings,
+        clipboard: clipboard,
+        scanner: scanner,
+        previewNotch: { [weak self] in self?.notchController?.preview() }
+    )
 
     private var notchController: NotchController?
     private var statusItem: NSStatusItem?

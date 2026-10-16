@@ -13,9 +13,11 @@ analytics, and your data never leaves your Mac.
 ## Features
 
 ### Notch
-- Opens when the cursor comes near the notch, when you drag a file toward it, when you click
-  it, or from a keyboard shortcut. Closes when you move away, click elsewhere or press Esc.
+- Opens when the cursor rests on the middle of the notch, when you drag a file toward it, when
+  you click it, or from a keyboard shortcut. Passing over it doesn't open it, and you can pick
+  how sensitive it is in Settings. Closes when you move away, click elsewhere or press Esc.
 - Fits the exact shape of your notch and animates smoothly between closed and open.
+- Frosted, glossy glass look like Control Center, with a slider from solid black to full glass.
 - Small live indicators beside the closed notch: an orange mic while an app is recording,
   album artwork and an equalizer while music plays, and the battery level when you plug in.
 

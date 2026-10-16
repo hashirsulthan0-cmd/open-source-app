@@ -31,6 +31,15 @@ enum NotchMetrics {
     static let openTopRadius: CGFloat = 16
     static let openBottomRadius: CGFloat = 26
 
+    /// How long the cursor must rest on the notch before it opens, per sensitivity.
+    static func hoverDelay(for sensitivity: HoverSensitivity) -> Duration {
+        switch sensitivity {
+        case .precise: .milliseconds(200)
+        case .balanced: .milliseconds(120)
+        case .relaxed: .zero
+        }
+    }
+
     /// Grace period after the cursor leaves before the notch closes.
     static let closeDelay: Duration = .milliseconds(250)
 

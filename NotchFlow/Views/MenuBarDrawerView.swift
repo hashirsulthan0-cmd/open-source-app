@@ -45,10 +45,7 @@ struct MenuBarDrawerView: View {
         .padding(.horizontal, 8)
         .frame(height: NotchMetrics.drawerHeight - 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.06))
-        }
+        .glossySurface(cornerRadius: 19)
     }
 
     @ViewBuilder
@@ -90,7 +87,7 @@ struct MenuBarDrawerView: View {
                 .foregroundStyle(.white.opacity(0.8))
                 .padding(.horizontal, 10)
                 .frame(height: 26)
-                .background(Capsule().fill(Color.white.opacity(0.1)))
+                .glossySurface(cornerRadius: 13)
         }
         .buttonStyle(.plain)
     }

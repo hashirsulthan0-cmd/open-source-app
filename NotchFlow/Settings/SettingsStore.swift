@@ -1,6 +1,34 @@
 import Foundation
 import ServiceManagement
 
+/// How easily hovering opens the notch.
+enum HoverSensitivity: String, CaseIterable, Identifiable {
+    /// Only the middle of the notch, around the camera, after a short pause.
+    case precise
+    /// Anywhere on the notch, after a very short pause.
+    case balanced
+    /// Anywhere near the notch, immediately.
+    case relaxed
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .precise: "Precise"
+        case .balanced: "Balanced"
+        case .relaxed: "Relaxed"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .precise: "Rest the cursor on the camera in the middle of the notch. Hard to open by accident."
+        case .balanced: "Rest the cursor anywhere on the notch."
+        case .relaxed: "Opens as soon as the cursor comes near the notch."
+        }
+    }
+}
+
 /// User preferences, saved in UserDefaults.
 @MainActor
 final class SettingsStore: ObservableObject {
@@ -13,6 +41,8 @@ final class SettingsStore: ObservableObject {
         static let saveClipboardHistory = "saveClipboardHistory"
         static let universalMediaSupport = "universalMediaSupport"
         static let showMenuBarDrawer = "showMenuBarDrawer"
+        static let hoverSensitivity = "hoverSensitivity"
+        static let glassIntensity = "glassIntensity"
     }
 
     private let defaults = UserDefaults.standard
@@ -20,6 +50,15 @@ final class SettingsStore: ObservableObject {
     /// Open the notch when the cursor comes close. When off, click the notch to open it.
     @Published var openOnHover: Bool {
         didSet { defaults.set(openOnHover, forKey: Key.openOnHover) }
+    }
+
+    @Published var hoverSensitivity: HoverSensitivity {
+        didSet { defaults.set(hoverSensitivity.rawValue, forKey: Key.hoverSensitivity) }
+    }
+
+    /// 0 is solid black; 1 is the most see-through, glossy glass.
+    @Published var glassIntensity: Double {
+        didSet { defaults.set(glassIntensity, forKey: Key.glassIntensity) }
     }
 
     @Published var hapticsEnabled: Bool {
@@ -69,6 +108,8 @@ final class SettingsStore: ObservableObject {
             Key.saveClipboardHistory: true,
             Key.universalMediaSupport: false,
             Key.showMenuBarDrawer: true,
+            Key.hoverSensitivity: HoverSensitivity.precise.rawValue,
+            Key.glassIntensity: 0.6,
         ])
         openOnHover = defaults.bool(forKey: Key.openOnHover)
         hapticsEnabled = defaults.bool(forKey: Key.hapticsEnabled)
@@ -78,6 +119,8 @@ final class SettingsStore: ObservableObject {
         saveClipboardHistory = defaults.bool(forKey: Key.saveClipboardHistory)
         universalMediaSupport = defaults.bool(forKey: Key.universalMediaSupport)
         showMenuBarDrawer = defaults.bool(forKey: Key.showMenuBarDrawer)
+        hoverSensitivity = HoverSensitivity(rawValue: defaults.string(forKey: Key.hoverSensitivity) ?? "") ?? .precise
+        glassIntensity = min(max(defaults.double(forKey: Key.glassIntensity), 0), 1)
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

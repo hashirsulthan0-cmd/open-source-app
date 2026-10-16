@@ -41,7 +41,7 @@ struct ClipboardView: View {
                 }
                 .padding(.horizontal, 10)
                 .frame(height: 26)
-                .background(Capsule().fill(Color.white.opacity(0.08)))
+                .glossySurface(cornerRadius: 13)
 
                 Button {
                     clipboard.clearUnpinned()
@@ -49,7 +49,7 @@ struct ClipboardView: View {
                     Image(systemName: "trash")
                         .font(.system(size: 11, weight: .semibold))
                         .frame(width: 26, height: 26)
-                        .background(Circle().fill(Color.white.opacity(0.08)))
+                        .glossySurface(cornerRadius: 13)
                 }
                 .buttonStyle(.plain)
                 .help("Clear history (pinned items are kept)")

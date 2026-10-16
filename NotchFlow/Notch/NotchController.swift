@@ -24,6 +24,8 @@ final class NotchController: NSObject {
     private var subscriptions: Set<AnyCancellable> = []
 
     private var closeTask: Task<Void, Never>?
+    /// Waits for the cursor to rest on the notch before opening, so passing over it doesn't.
+    private var hoverOpenTask: Task<Void, Never>?
     private var collapseTask: Task<Void, Never>?
     private var indicatorResizeTask: Task<Void, Never>?
     private var chargingIndicatorTask: Task<Void, Never>?
@@ -69,6 +71,7 @@ final class NotchController: NSObject {
             frame: NSRect(origin: .zero, size: panel.frame.size),
             rootView: NotchRootView(
                 viewModel: viewModel,
+                settings: settings,
                 clipboard: clipboard,
                 shelf: shelf,
                 hud: hud,
@@ -126,6 +129,7 @@ final class NotchController: NSObject {
 
     func open(manually: Bool = false) {
         cancelScheduledClose()
+        cancelHoverOpen()
         collapseTask?.cancel()
         collapseTask = nil
         indicatorResizeTask?.cancel()
@@ -200,6 +204,35 @@ final class NotchController: NSObject {
             self.closeTask = nil
             self.close()
         }
+    }
+
+    private func scheduleHoverOpen(after delay: Duration) {
+        guard delay > .zero else {
+            open()
+            return
+        }
+        guard hoverOpenTask == nil else { return }
+        hoverOpenTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard let self, !Task.isCancelled else { return }
+            self.hoverOpenTask = nil
+            // Only open if the cursor is still resting on the notch.
+            let location = NSEvent.mouseLocation
+            if self.viewModel.geometry.openZone(for: self.settings.hoverSensitivity).contains(location),
+               NSEvent.pressedMouseButtons == 0 {
+                self.open()
+            }
+        }
+    }
+
+    private func cancelHoverOpen() {
+        hoverOpenTask?.cancel()
+        hoverOpenTask = nil
+    }
+
+    /// Opens the notch from Settings so changes can be seen live.
+    func preview() {
+        open(manually: true)
     }
 
     private func cancelScheduledClose() {
@@ -409,7 +442,10 @@ final class NotchController: NSObject {
         switch event.type {
         case .leftMouseDown:
             dragChangeCountAtMouseDown = NSPasteboard(name: .drag).changeCount
-            if viewModel.isOpen && !viewModel.geometry.openShapeRect.contains(location) {
+            // Clicks in NotchFlow's other windows (like Settings) leave the notch alone,
+            // so you can watch a setting change while previewing it.
+            let isOtherOwnWindow = event.window != nil && event.window !== panel
+            if viewModel.isOpen && !isOtherOwnWindow && !viewModel.geometry.openShapeRect.contains(location) {
                 close()
                 return
             }
@@ -438,14 +474,22 @@ final class NotchController: NSObject {
             // Content drags always open the notch so there is somewhere to drop.
             // Plain hovering only does when the setting is on. Never pop open while the
             // user is dragging a window or selecting text across the top of the screen.
-            let mouseIsDown = NSEvent.pressedMouseButtons != 0
-            let wantsOpen = isDraggingContent || (settings.openOnHover && !mouseIsDown)
-            if geometry.hoverZone.contains(location) && wantsOpen {
-                if isDraggingContent {
+            if isDraggingContent {
+                cancelHoverOpen()
+                if geometry.hoverZone.contains(location) {
                     viewModel.selectedTab = .shelf
+                    open()
                 }
-                open()
+                return
             }
+
+            let mouseIsDown = NSEvent.pressedMouseButtons != 0
+            let sensitivity = settings.hoverSensitivity
+            guard settings.openOnHover, !mouseIsDown, geometry.openZone(for: sensitivity).contains(location) else {
+                cancelHoverOpen()
+                return
+            }
+            scheduleHoverOpen(after: NotchMetrics.hoverDelay(for: sensitivity))
             return
         }
 
@@ -486,10 +530,8 @@ final class NotchController: NSObject {
 
 extension NotchController: NotchContainerViewDelegate {
     func containerMouseEntered() {
-        // Hovering the notch itself opens it, even if the cursor jumped straight in.
-        if settings.openOnHover && NSEvent.pressedMouseButtons == 0 {
-            open()
-        }
+        // Same rules as hovering anywhere else: the sensitivity setting and the short pause apply.
+        updateForCursor(at: NSEvent.mouseLocation)
     }
 
     func containerMouseExited() {

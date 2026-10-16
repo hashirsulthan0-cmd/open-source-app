@@ -26,10 +26,7 @@ struct StatusCard<Content: View>: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.07))
-        }
+        .glossySurface(cornerRadius: 18)
     }
 }
 

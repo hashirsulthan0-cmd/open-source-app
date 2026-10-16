@@ -3,6 +3,7 @@ import SwiftUI
 /// Artwork, track details, progress and playback controls.
 struct NowPlayingCard: View {
     @ObservedObject var nowPlaying: NowPlayingManager
+    @Environment(\.glassIntensity) private var intensity
 
     var body: some View {
         StatusCard {
@@ -31,9 +32,19 @@ struct NowPlayingCard: View {
 
                 HStack(spacing: 22) {
                     controlButton("backward.fill", label: "Previous track") { nowPlaying.send(.previousTrack) }
-                    controlButton(info.isPlaying ? "pause.fill" : "play.fill", label: info.isPlaying ? "Pause" : "Play", size: 18) {
+                    Button {
                         nowPlaying.send(.togglePlayPause)
+                    } label: {
+                        Image(systemName: info.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(Color.white.opacity(0.92)))
+                            .shadow(color: .white.opacity(0.25 * intensity), radius: 5)
+                            .contentShape(Circle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(info.isPlaying ? "Pause" : "Play")
                     controlButton("forward.fill", label: "Next track") { nowPlaying.send(.nextTrack) }
                 }
                 .frame(maxWidth: .infinity)

@@ -11,15 +11,12 @@ struct NotchCard<Content: View>: View {
         content()
             .frame(width: 128)
             .frame(maxHeight: .infinity)
-            .background {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(isHovering || isHighlighted ? 0.13 : 0.07))
-            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .glossySurface(cornerRadius: 12, highlighted: isHovering || isHighlighted)
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(Color.white.opacity(isHighlighted ? 0.5 : 0), lineWidth: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .onHover { isHovering = $0 }
             .animation(.easeOut(duration: 0.12), value: isHovering)
@@ -61,10 +58,7 @@ struct NotchEmptyState: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.05))
-        }
+        .glossySurface(cornerRadius: 14)
     }
 }
 
