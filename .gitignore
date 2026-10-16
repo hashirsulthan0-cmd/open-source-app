@@ -30,3 +30,8 @@ build/
 out/
 coverage/
 *.log
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
