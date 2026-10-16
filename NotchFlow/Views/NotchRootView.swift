@@ -32,10 +32,8 @@ struct NotchRootView: View {
                 )
                 .transition(
                     .asymmetric(
-                        insertion: .opacity
-                            .combined(with: .scale(scale: 0.94, anchor: .top))
-                            .animation(NotchMetrics.spring.delay(0.05)),
-                        removal: .opacity.animation(.easeOut(duration: 0.12))
+                        insertion: .opacity.animation(.easeOut(duration: 0.18).delay(0.08)),
+                        removal: .identity
                     )
                 )
             } else if viewModel.hasClosedIndicator {
@@ -51,7 +49,8 @@ struct NotchRootView: View {
         .background {
             NotchGlassBackground(
                 isOpen: isOpen,
-                topBandHeight: max(viewModel.geometry.notchRect.height, 32)
+                topBandHeight: max(viewModel.geometry.notchRect.height, 32),
+                usesLiveBlur: settings.liveBlur
             )
         }
         .clipShape(shape)

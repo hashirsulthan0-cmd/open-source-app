@@ -144,7 +144,7 @@ struct EqualizerView: View {
     var color: Color = .white.opacity(0.8)
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 20, paused: !isPlaying)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 12, paused: !isPlaying)) { context in
             let time = context.date.timeIntervalSinceReferenceDate
             HStack(alignment: .bottom, spacing: max(1, height / 8)) {
                 ForEach(0..<barCount, id: \.self) { index in

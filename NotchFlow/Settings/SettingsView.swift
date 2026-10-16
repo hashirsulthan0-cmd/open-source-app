@@ -96,6 +96,11 @@ private struct AppearanceSettings: View {
                         Text("Glass").font(.caption)
                     }
                 }
+                Toggle("See-through blur", isOn: $settings.liveBlur)
+                Text("Blurs what’s behind the notch, like Control Center. Uses more graphics power: "
+                    + "leave it off if NotchFlow feels slow while apps like Blender are busy.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 HStack {
                     Text("Changes show up in the notch right away.")
                         .font(.caption)

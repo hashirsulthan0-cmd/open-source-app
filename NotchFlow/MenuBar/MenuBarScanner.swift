@@ -45,7 +45,7 @@ final class MenuBarScanner: ObservableObject {
     func startLiveUpdates() {
         refresh()
         guard timer == nil else { return }
-        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 4, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.refresh()
             }

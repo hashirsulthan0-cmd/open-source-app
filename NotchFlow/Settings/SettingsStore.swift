@@ -43,6 +43,7 @@ final class SettingsStore: ObservableObject {
         static let showMenuBarDrawer = "showMenuBarDrawer"
         static let hoverSensitivity = "hoverSensitivity"
         static let glassIntensity = "glassIntensity"
+        static let liveBlur = "liveBlur"
     }
 
     private let defaults = UserDefaults.standard
@@ -59,6 +60,12 @@ final class SettingsStore: ObservableObject {
     /// 0 is solid black; 1 is the most see-through, glossy glass.
     @Published var glassIntensity: Double {
         didSet { defaults.set(glassIntensity, forKey: Key.glassIntensity) }
+    }
+
+    /// Blur what's behind the open notch. Looks best, but uses noticeably more graphics
+    /// power, so it's off by default.
+    @Published var liveBlur: Bool {
+        didSet { defaults.set(liveBlur, forKey: Key.liveBlur) }
     }
 
     @Published var hapticsEnabled: Bool {
@@ -110,6 +117,7 @@ final class SettingsStore: ObservableObject {
             Key.showMenuBarDrawer: true,
             Key.hoverSensitivity: HoverSensitivity.precise.rawValue,
             Key.glassIntensity: 0.6,
+            Key.liveBlur: false,
         ])
         openOnHover = defaults.bool(forKey: Key.openOnHover)
         hapticsEnabled = defaults.bool(forKey: Key.hapticsEnabled)
@@ -121,6 +129,7 @@ final class SettingsStore: ObservableObject {
         showMenuBarDrawer = defaults.bool(forKey: Key.showMenuBarDrawer)
         hoverSensitivity = HoverSensitivity(rawValue: defaults.string(forKey: Key.hoverSensitivity) ?? "") ?? .precise
         glassIntensity = min(max(defaults.double(forKey: Key.glassIntensity), 0), 1)
+        liveBlur = defaults.bool(forKey: Key.liveBlur)
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

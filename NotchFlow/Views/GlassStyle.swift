@@ -33,17 +33,31 @@ struct BehindWindowBlur: NSViewRepresentable {
 
 /// Background of the notch shape. Closed, it's pure black so it blends with the camera
 /// notch. Open, it's frosted glass that stays black along the top edge for the same reason.
+///
+/// The live blur is the most expensive part: macOS re-blurs everything behind the notch
+/// on every frame. Without it, the glass is drawn as an opaque dark tint with the same
+/// highlights, which looks close and costs almost nothing.
 struct NotchGlassBackground: View {
     let isOpen: Bool
     let topBandHeight: CGFloat
+    let usesLiveBlur: Bool
     @Environment(\.glassIntensity) private var intensity
 
     var body: some View {
         ZStack(alignment: .top) {
             if isOpen && intensity > 0.01 {
-                BehindWindowBlur()
-                // A dark tint keeps text readable; less tint means more glass.
-                Color.black.opacity(1 - 0.55 * intensity)
+                if usesLiveBlur {
+                    BehindWindowBlur()
+                    // A dark tint keeps text readable; less tint means more glass.
+                    Color.black.opacity(1 - 0.55 * intensity)
+                } else {
+                    // Opaque smoky glass: lifts from black toward a soft grey as glossiness rises.
+                    LinearGradient(
+                        colors: [Color(white: 0.04 + 0.06 * intensity), Color(white: 0.08 + 0.10 * intensity)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
                 // Soft sheen across the top half, like light hitting glass.
                 LinearGradient(
                     colors: [Color.white.opacity(0.07 * intensity), .clear],
@@ -105,7 +119,6 @@ struct GlossySurface: ViewModifier {
                     lineWidth: 1
                 )
             }
-            .shadow(color: .black.opacity(0.25 * intensity), radius: 6, y: 3)
     }
 }
 
