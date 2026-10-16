@@ -3,19 +3,21 @@ import SwiftUI
 /// Status tab: battery and microphone at a glance.
 struct StatusView: View {
     @ObservedObject var hud: SystemHUDManager
+    @ObservedObject var nowPlaying: NowPlayingManager
 
     var body: some View {
         HStack(spacing: 8) {
+            NowPlayingCard(nowPlaying: nowPlaying)
+                .frame(width: 250)
             if hud.battery.hasBattery {
                 BatteryCard(battery: hud.battery)
             }
             MicrophoneCard(microphone: hud.microphone)
-            NowPlayingCard()
         }
     }
 }
 
-private struct StatusCard<Content: View>: View {
+struct StatusCard<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -140,21 +142,6 @@ private struct MicrophoneCard: View {
     }
 }
 
-private struct NowPlayingCard: View {
-    var body: some View {
-        StatusCard {
-            Label("Now Playing", systemImage: "music.note")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.6))
-            Spacer(minLength: 0)
-            Text("Media controls are coming in the next update.")
-                .font(.system(size: 10.5))
-                .foregroundStyle(.white.opacity(0.55))
-                .lineLimit(3)
-        }
-    }
-}
-
 /// Icons shown on each side of the closed notch.
 struct ClosedNotchIndicators: View {
     @ObservedObject var viewModel: NotchViewModel
@@ -181,6 +168,8 @@ struct ClosedNotchIndicators: View {
             Image(systemName: "waveform")
                 .foregroundStyle(.orange)
                 .symbolEffect(.variableColor.iterative, options: .repeating)
+        } else if let nowPlaying = viewModel.nowPlayingIndicator {
+            ArtworkView(image: nowPlaying.artwork, size: 18)
         }
     }
 
@@ -193,6 +182,8 @@ struct ClosedNotchIndicators: View {
             Text("\(percentage)%")
                 .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.green)
+        } else if let nowPlaying = viewModel.nowPlayingIndicator {
+            EqualizerView(isPlaying: nowPlaying.isPlaying, barCount: 4, height: 12, color: .white.opacity(0.85))
         }
     }
 }

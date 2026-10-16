@@ -13,6 +13,7 @@ final class NotchController: NSObject {
     private let clipboard: ClipboardManager
     private let shelf: FileTrayManager
     private let hud: SystemHUDManager
+    private let nowPlaying: NowPlayingManager
     private let settings: SettingsStore
     private let openSettings: () -> Void
 
@@ -40,12 +41,14 @@ final class NotchController: NSObject {
         clipboard: ClipboardManager,
         shelf: FileTrayManager,
         hud: SystemHUDManager,
+        nowPlaying: NowPlayingManager,
         settings: SettingsStore,
         openSettings: @escaping () -> Void
     ) {
         self.clipboard = clipboard
         self.shelf = shelf
         self.hud = hud
+        self.nowPlaying = nowPlaying
         self.settings = settings
         self.openSettings = openSettings
         super.init()
@@ -65,6 +68,7 @@ final class NotchController: NSObject {
                 clipboard: clipboard,
                 shelf: shelf,
                 hud: hud,
+                nowPlaying: nowPlaying,
                 openSettings: { [weak self] in
                     self?.close()
                     self?.openSettings()
@@ -203,6 +207,18 @@ final class NotchController: NSObject {
             }
             .store(in: &subscriptions)
 
+        // Artwork and equalizer beside the notch while something plays. Paused tracks hide it.
+        nowPlaying.$info
+            .combineLatest(settings.$showNowPlayingIndicator)
+            .map(Self.indicatorTrack)
+            .removeDuplicates(by: Self.isSameIndicatorTrack)
+            .sink { [weak self] (info: NowPlayingInfo?) in
+                MainActor.assumeIsolated {
+                    self?.updateIndicators { $0.nowPlayingIndicator = info }
+                }
+            }
+            .store(in: &subscriptions)
+
         // Show the battery level for a few seconds when the charger is connected.
         hud.$battery
             .map(\.isPluggedIn)
@@ -215,6 +231,24 @@ final class NotchController: NSObject {
                 }
             }
             .store(in: &subscriptions)
+    }
+
+    /// The track to show beside the closed notch: only while playing, and only if enabled.
+    private nonisolated static func indicatorTrack(_ info: NowPlayingInfo?, isEnabled: Bool) -> NowPlayingInfo? {
+        guard isEnabled, let info, info.isPlaying else { return nil }
+        return info
+    }
+
+    /// Position updates arrive often; only a new track or new artwork should redraw the indicator.
+    private nonisolated static func isSameIndicatorTrack(_ lhs: NowPlayingInfo?, _ rhs: NowPlayingInfo?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case let (lhs?, rhs?):
+            return lhs.title == rhs.title && lhs.artist == rhs.artist && lhs.artwork === rhs.artwork
+        default:
+            return false
+        }
     }
 
     private func flashChargingIndicator() {

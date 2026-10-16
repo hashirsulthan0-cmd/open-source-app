@@ -9,7 +9,9 @@ final class SettingsStore: ObservableObject {
         static let hapticsEnabled = "hapticsEnabled"
         static let showMicrophoneIndicator = "showMicrophoneIndicator"
         static let showChargingIndicator = "showChargingIndicator"
+        static let showNowPlayingIndicator = "showNowPlayingIndicator"
         static let saveClipboardHistory = "saveClipboardHistory"
+        static let universalMediaSupport = "universalMediaSupport"
     }
 
     private let defaults = UserDefaults.standard
@@ -33,9 +35,19 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(showChargingIndicator, forKey: Key.showChargingIndicator) }
     }
 
+    /// Show the album artwork and an equalizer next to the closed notch while music plays.
+    @Published var showNowPlayingIndicator: Bool {
+        didSet { defaults.set(showNowPlayingIndicator, forKey: Key.showNowPlayingIndicator) }
+    }
+
     /// When off, new copies are not recorded. Existing history is kept.
     @Published var saveClipboardHistory: Bool {
         didSet { defaults.set(saveClipboardHistory, forKey: Key.saveClipboardHistory) }
+    }
+
+    /// Use the bundled mediaremote-adapter to see media from every app, browsers included.
+    @Published var universalMediaSupport: Bool {
+        didSet { defaults.set(universalMediaSupport, forKey: Key.universalMediaSupport) }
     }
 
     @Published private(set) var launchAtLogin: Bool
@@ -47,13 +59,17 @@ final class SettingsStore: ObservableObject {
             Key.hapticsEnabled: true,
             Key.showMicrophoneIndicator: true,
             Key.showChargingIndicator: true,
+            Key.showNowPlayingIndicator: true,
             Key.saveClipboardHistory: true,
+            Key.universalMediaSupport: false,
         ])
         openOnHover = defaults.bool(forKey: Key.openOnHover)
         hapticsEnabled = defaults.bool(forKey: Key.hapticsEnabled)
         showMicrophoneIndicator = defaults.bool(forKey: Key.showMicrophoneIndicator)
         showChargingIndicator = defaults.bool(forKey: Key.showChargingIndicator)
+        showNowPlayingIndicator = defaults.bool(forKey: Key.showNowPlayingIndicator)
         saveClipboardHistory = defaults.bool(forKey: Key.saveClipboardHistory)
+        universalMediaSupport = defaults.bool(forKey: Key.universalMediaSupport)
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

@@ -28,6 +28,17 @@ struct SettingsView: View {
             Section("Notch indicators") {
                 Toggle("Show when an app is using the microphone", isOn: $settings.showMicrophoneIndicator)
                 Toggle("Show battery level when the charger is connected", isOn: $settings.showChargingIndicator)
+                Toggle("Show what’s playing", isOn: $settings.showNowPlayingIndicator)
+            }
+
+            Section("Now Playing") {
+                Toggle("Universal media support", isOn: $settings.universalMediaSupport)
+                    .disabled(!NowPlayingManager.isUniversalSupportAvailable)
+                Text("Music and Spotify always work. Turn this on to also see browsers, podcasts and other players. "
+                    + "It uses the open-source mediaremote-adapter, which isn’t supported by Apple and may stop "
+                    + "working after a macOS update.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Clipboard") {

@@ -7,6 +7,7 @@ struct NotchRootView: View {
     let clipboard: ClipboardManager
     let shelf: FileTrayManager
     let hud: SystemHUDManager
+    let nowPlaying: NowPlayingManager
     let openSettings: () -> Void
 
     var body: some View {
@@ -23,6 +24,7 @@ struct NotchRootView: View {
                     clipboard: clipboard,
                     shelf: shelf,
                     hud: hud,
+                    nowPlaying: nowPlaying,
                     openSettings: openSettings
                 )
                 .transition(
@@ -75,6 +77,7 @@ struct NotchExpandedView: View {
     let clipboard: ClipboardManager
     let shelf: FileTrayManager
     let hud: SystemHUDManager
+    let nowPlaying: NowPlayingManager
     let openSettings: () -> Void
 
     var body: some View {
@@ -109,7 +112,7 @@ struct NotchExpandedView: View {
                 case .shelf:
                     ShelfView(shelf: shelf, isDropTargeted: viewModel.isDropTargeted)
                 case .status:
-                    StatusView(hud: hud)
+                    StatusView(hud: hud, nowPlaying: nowPlaying)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

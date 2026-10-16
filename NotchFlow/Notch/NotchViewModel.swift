@@ -42,6 +42,8 @@ final class NotchViewModel: ObservableObject {
     @Published var showsMicrophoneIndicator = false
     /// Battery percentage shown briefly after the charger is connected.
     @Published var chargingIndicatorPercentage: Int?
+    /// The track shown beside the closed notch while music plays.
+    @Published var nowPlayingIndicator: NowPlayingInfo?
 
     /// Incremented to ask the clipboard search field to take keyboard focus.
     @Published private(set) var searchFocusRequest = 0
@@ -53,7 +55,7 @@ final class NotchViewModel: ObservableObject {
     var isOpen: Bool { state == .open }
 
     var hasClosedIndicator: Bool {
-        showsMicrophoneIndicator || chargingIndicatorPercentage != nil
+        showsMicrophoneIndicator || chargingIndicatorPercentage != nil || nowPlayingIndicator != nil
     }
 
     var closedExtraWidth: CGFloat {

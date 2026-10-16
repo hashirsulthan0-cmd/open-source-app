@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let clipboard = ClipboardManager()
     private let shelf = FileTrayManager()
     private let hud = SystemHUDManager()
+    private let nowPlaying = NowPlayingManager()
     private lazy var settingsWindow = SettingsWindowController(settings: settings, clipboard: clipboard)
 
     private var notchController: NotchController?
@@ -40,11 +41,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         clipboard.start()
         hud.start()
+        nowPlaying.start(settings: settings)
 
         let controller = NotchController(
             clipboard: clipboard,
             shelf: shelf,
             hud: hud,
+            nowPlaying: nowPlaying,
             settings: settings,
             openSettings: { [weak self] in self?.settingsWindow.show() }
         )
@@ -65,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotKeyCenter.shared.unregisterAll()
         notchController?.stop()
         hud.stop()
+        nowPlaying.stop()
         clipboard.stop()
         shelf.save()
     }

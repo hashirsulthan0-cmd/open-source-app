@@ -18,3 +18,9 @@ Contributions are welcome. Open an issue to discuss a change, or send a pull req
 ## License
 
 Released under the [MIT License](LICENSE).
+
+## Credits
+
+Universal Now Playing support uses [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter)
+by Jonas van den Berg, included in `ThirdParty/` under the BSD 3-Clause License
+(see `ThirdParty/mediaremote-adapter/LICENSE`).
