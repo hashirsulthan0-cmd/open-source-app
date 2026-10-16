@@ -24,6 +24,8 @@ final class ClipboardManager: ObservableObject {
 
     @Published private(set) var items: [ClipboardItem]
     @Published var searchText = ""
+    /// When false, new copies are ignored (the "Save clipboard history" setting).
+    var isRecording = true
 
     private let pasteboard = NSPasteboard.general
     private let store = JSONFileStore<[ClipboardItem]>(
@@ -105,12 +107,21 @@ final class ClipboardManager: ObservableObject {
         scheduleSave()
     }
 
+    /// Removes everything, pinned items included.
+    func clearAll() {
+        let removed = items
+        items.removeAll()
+        removed.forEach(deleteImageIfUnused)
+        scheduleSave()
+    }
+
     // MARK: - Capturing
 
     private func checkPasteboard() {
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else { return }
         lastChangeCount = changeCount
+        guard isRecording else { return }
 
         let types = Set(pasteboard.types ?? [])
         guard types.isDisjoint(with: Self.ignoredTypes), let item = captureCurrentContents() else { return }

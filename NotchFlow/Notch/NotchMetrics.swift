@@ -11,6 +11,12 @@ enum NotchMetrics {
     /// Transparent room around the expanded notch so its shadow isn't cut off.
     static let shadowPadding: CGFloat = 24
 
+    /// Extra width on each side of the closed notch while an indicator is showing.
+    static let indicatorWidth: CGFloat = 34
+
+    /// How long the battery level stays next to the notch after plugging in.
+    static let chargingIndicatorDuration: Duration = .seconds(4)
+
     /// Width of the virtual notch drawn on screens without a camera notch.
     static let fallbackPillWidth: CGFloat = 200
     static let fallbackPillMinHeight: CGFloat = 24

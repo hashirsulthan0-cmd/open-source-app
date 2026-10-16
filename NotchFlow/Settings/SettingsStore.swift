@@ -1,0 +1,74 @@
+import Foundation
+import ServiceManagement
+
+/// User preferences, saved in UserDefaults.
+@MainActor
+final class SettingsStore: ObservableObject {
+    private enum Key {
+        static let openOnHover = "openOnHover"
+        static let hapticsEnabled = "hapticsEnabled"
+        static let showMicrophoneIndicator = "showMicrophoneIndicator"
+        static let showChargingIndicator = "showChargingIndicator"
+        static let saveClipboardHistory = "saveClipboardHistory"
+    }
+
+    private let defaults = UserDefaults.standard
+
+    /// Open the notch when the cursor comes close. When off, click the notch to open it.
+    @Published var openOnHover: Bool {
+        didSet { defaults.set(openOnHover, forKey: Key.openOnHover) }
+    }
+
+    @Published var hapticsEnabled: Bool {
+        didSet { defaults.set(hapticsEnabled, forKey: Key.hapticsEnabled) }
+    }
+
+    /// Show an orange microphone next to the closed notch while an app is recording.
+    @Published var showMicrophoneIndicator: Bool {
+        didSet { defaults.set(showMicrophoneIndicator, forKey: Key.showMicrophoneIndicator) }
+    }
+
+    /// Briefly show the battery level next to the notch when the charger is connected.
+    @Published var showChargingIndicator: Bool {
+        didSet { defaults.set(showChargingIndicator, forKey: Key.showChargingIndicator) }
+    }
+
+    /// When off, new copies are not recorded. Existing history is kept.
+    @Published var saveClipboardHistory: Bool {
+        didSet { defaults.set(saveClipboardHistory, forKey: Key.saveClipboardHistory) }
+    }
+
+    @Published private(set) var launchAtLogin: Bool
+    @Published private(set) var launchAtLoginError: String?
+
+    init() {
+        defaults.register(defaults: [
+            Key.openOnHover: true,
+            Key.hapticsEnabled: true,
+            Key.showMicrophoneIndicator: true,
+            Key.showChargingIndicator: true,
+            Key.saveClipboardHistory: true,
+        ])
+        openOnHover = defaults.bool(forKey: Key.openOnHover)
+        hapticsEnabled = defaults.bool(forKey: Key.hapticsEnabled)
+        showMicrophoneIndicator = defaults.bool(forKey: Key.showMicrophoneIndicator)
+        showChargingIndicator = defaults.bool(forKey: Key.showChargingIndicator)
+        saveClipboardHistory = defaults.bool(forKey: Key.saveClipboardHistory)
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            launchAtLoginError = nil
+        } catch {
+            launchAtLoginError = "Couldn’t change this: \(error.localizedDescription) "
+                + "Moving NotchFlow to your Applications folder usually fixes it."
+        }
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+}

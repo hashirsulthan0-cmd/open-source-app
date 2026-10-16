@@ -11,7 +11,7 @@ final class NotchViewModel: ObservableObject {
     enum Tab: String, CaseIterable, Identifiable {
         case clipboard
         case shelf
-        case nowPlaying
+        case status
 
         var id: String { rawValue }
 
@@ -19,7 +19,7 @@ final class NotchViewModel: ObservableObject {
             switch self {
             case .clipboard: "Clipboard"
             case .shelf: "Shelf"
-            case .nowPlaying: "Now Playing"
+            case .status: "Status"
             }
         }
 
@@ -27,7 +27,7 @@ final class NotchViewModel: ObservableObject {
             switch self {
             case .clipboard: "doc.on.clipboard"
             case .shelf: "tray.full"
-            case .nowPlaying: "music.note"
+            case .status: "bolt.horizontal.circle"
             }
         }
     }
@@ -38,14 +38,30 @@ final class NotchViewModel: ObservableObject {
     /// True while something is being dragged over the notch.
     @Published var isDropTargeted = false
 
+    // Indicators beside the closed notch.
+    @Published var showsMicrophoneIndicator = false
+    /// Battery percentage shown briefly after the charger is connected.
+    @Published var chargingIndicatorPercentage: Int?
+
+    /// Incremented to ask the clipboard search field to take keyboard focus.
+    @Published private(set) var searchFocusRequest = 0
+
     init(geometry: NotchGeometry) {
         self.geometry = geometry
     }
 
     var isOpen: Bool { state == .open }
 
+    var hasClosedIndicator: Bool {
+        showsMicrophoneIndicator || chargingIndicatorPercentage != nil
+    }
+
+    var closedExtraWidth: CGFloat {
+        hasClosedIndicator ? NotchMetrics.indicatorWidth : 0
+    }
+
     var currentSize: CGSize {
-        isOpen ? geometry.openSize : geometry.closedSize
+        isOpen ? geometry.openSize : geometry.closedSize(extraWidth: closedExtraWidth)
     }
 
     func setState(_ newState: State) {
@@ -53,5 +69,9 @@ final class NotchViewModel: ObservableObject {
         withAnimation(NotchMetrics.spring) {
             state = newState
         }
+    }
+
+    func requestSearchFocus() {
+        searchFocusRequest += 1
     }
 }

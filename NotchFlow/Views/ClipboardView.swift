@@ -4,6 +4,10 @@ import SwiftUI
 /// Click a card to copy it again; right-click for more options.
 struct ClipboardView: View {
     @ObservedObject var clipboard: ClipboardManager
+    /// Changes when the search field should take keyboard focus (from the ⌃⌥V shortcut).
+    var focusRequest = 0
+
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         let items = clipboard.visibleItems
@@ -17,6 +21,13 @@ struct ClipboardView: View {
                     TextField("Search clipboard, including text in images", text: $clipboard.searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
+                        .focused($isSearchFocused)
+                        .onSubmit {
+                            // Return copies the first match, so search-then-paste is keyboard only.
+                            if let first = clipboard.visibleItems.first {
+                                clipboard.copyToPasteboard(first)
+                            }
+                        }
                     if !clipboard.searchText.isEmpty {
                         Button {
                             clipboard.searchText = ""
@@ -68,6 +79,17 @@ struct ClipboardView: View {
                     }
                 }
             }
+        }
+        .onAppear { focusIfRequested() }
+        .onChange(of: focusRequest) { focusIfRequested() }
+    }
+
+    private func focusIfRequested() {
+        guard focusRequest > 0 else { return }
+        // Wait a moment for the window to become key before moving focus into it.
+        Task {
+            try? await Task.sleep(for: .milliseconds(80))
+            isSearchFocused = true
         }
     }
 }

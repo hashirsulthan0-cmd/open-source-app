@@ -63,9 +63,13 @@ struct NotchGeometry: Equatable {
 
     // MARK: - Sizes for the SwiftUI shape
 
-    /// Closed shape: the notch plus its two small top ears.
-    var closedSize: CGSize {
-        CGSize(width: notchRect.width + NotchMetrics.closedTopRadius * 2, height: notchRect.height)
+    /// Closed shape: the notch plus its two small top ears. `extraWidth` is added on each
+    /// side when an indicator (microphone, charging) is shown next to the notch.
+    func closedSize(extraWidth: CGFloat = 0) -> CGSize {
+        CGSize(
+            width: notchRect.width + (NotchMetrics.closedTopRadius + extraWidth) * 2,
+            height: notchRect.height
+        )
     }
 
     var openSize: CGSize { NotchMetrics.openSize }
@@ -73,8 +77,8 @@ struct NotchGeometry: Equatable {
     // MARK: - Window frames
 
     /// Window frame while closed. It hugs the notch so nothing around it is blocked.
-    var closedPanelFrame: NSRect {
-        let size = closedSize
+    func closedPanelFrame(extraWidth: CGFloat = 0) -> NSRect {
+        let size = closedSize(extraWidth: extraWidth)
         return NSRect(
             x: notchRect.midX - size.width / 2,
             y: screenFrame.maxY - size.height,

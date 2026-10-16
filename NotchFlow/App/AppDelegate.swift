@@ -1,15 +1,21 @@
 import AppKit
+import Combine
 
 /// App entry point. NotchFlow is an "agent" app: it has no Dock icon and no
 /// app menus (`LSUIElement` in the generated Info.plist). The only always-visible
-/// pieces are the notch panel and a small menu bar icon used to open or quit the app.
+/// pieces are the notch panel and a small menu bar icon used to open settings or quit.
 @main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let settings = SettingsStore()
     private let clipboard = ClipboardManager()
     private let shelf = FileTrayManager()
+    private let hud = SystemHUDManager()
+    private lazy var settingsWindow = SettingsWindowController(settings: settings, clipboard: clipboard)
+
     private var notchController: NotchController?
     private var statusItem: NSStatusItem?
+    private var subscriptions: Set<AnyCancellable> = []
 
     static func main() {
         let app = NSApplication.shared
@@ -24,17 +30,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        clipboard.start()
+        settings.$saveClipboardHistory
+            .sink { [weak self] isOn in
+                MainActor.assumeIsolated {
+                    self?.clipboard.isRecording = isOn
+                }
+            }
+            .store(in: &subscriptions)
 
-        let controller = NotchController(clipboard: clipboard, shelf: shelf)
+        clipboard.start()
+        hud.start()
+
+        let controller = NotchController(
+            clipboard: clipboard,
+            shelf: shelf,
+            hud: hud,
+            settings: settings,
+            openSettings: { [weak self] in self?.settingsWindow.show() }
+        )
         controller.start()
         notchController = controller
+
+        HotKeyCenter.shared.register(HotKeyCenter.toggleNotch) { [weak controller] in
+            controller?.toggle()
+        }
+        HotKeyCenter.shared.register(HotKeyCenter.openClipboard) { [weak controller] in
+            controller?.openClipboardSearch()
+        }
 
         installStatusItem()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        HotKeyCenter.shared.unregisterAll()
         notchController?.stop()
+        hud.stop()
         clipboard.stop()
         shelf.save()
     }
@@ -49,25 +79,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         let menu = NSMenu()
-
-        let openItem = NSMenuItem(title: "Open Notch", action: #selector(openNotch), keyEquivalent: "")
-        openItem.target = self
-        menu.addItem(openItem)
-
+        menu.addItem(menuItem("Open Notch", action: #selector(openNotch)))
+        menu.addItem(menuItem("Search Clipboard", action: #selector(openClipboardSearch)))
         menu.addItem(.separator())
-
-        let quitItem = NSMenuItem(
+        menu.addItem(menuItem("Settings…", action: #selector(openSettings), key: ","))
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(
             title: "Quit NotchFlow",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
-        )
-        menu.addItem(quitItem)
+        ))
 
         item.menu = menu
         statusItem = item
     }
 
+    private func menuItem(_ title: String, action: Selector, key: String = "") -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.target = self
+        return item
+    }
+
     @objc private func openNotch() {
         notchController?.open(manually: true)
+    }
+
+    @objc private func openClipboardSearch() {
+        notchController?.openClipboardSearch()
+    }
+
+    @objc private func openSettings() {
+        settingsWindow.show()
     }
 }

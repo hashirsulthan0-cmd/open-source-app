@@ -65,7 +65,6 @@ final class NotchContainerView: NSView {
     override func mouseExited(with event: NSEvent) {
         delegate?.containerMouseExited()
     }
-
     // MARK: - Drag and drop
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

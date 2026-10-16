@@ -1,20 +1,29 @@
 import AppKit
+import Combine
+import SwiftUI
 
 /// Owns the notch window and decides when it opens and closes.
 ///
-/// The notch opens when the cursor comes within `NotchMetrics.hoverMargin` of it,
-/// or when something is being dragged toward it. It closes shortly after the cursor
-/// leaves, or right away on a click outside.
+/// The notch opens when the cursor comes within `NotchMetrics.hoverMargin` of it (or on
+/// click, if hover is turned off), when something is dragged toward it, or from a keyboard
+/// shortcut. It closes shortly after the cursor leaves, on a click outside, or with Esc.
 @MainActor
 final class NotchController: NSObject {
     private let viewModel = NotchViewModel(geometry: .zero)
     private let clipboard: ClipboardManager
     private let shelf: FileTrayManager
+    private let hud: SystemHUDManager
+    private let settings: SettingsStore
+    private let openSettings: () -> Void
+
     private var panel: NotchPanel?
     private var eventMonitors: [Any] = []
+    private var subscriptions: Set<AnyCancellable> = []
 
     private var closeTask: Task<Void, Never>?
     private var collapseTask: Task<Void, Never>?
+    private var indicatorResizeTask: Task<Void, Never>?
+    private var chargingIndicatorTask: Task<Void, Never>?
 
     /// `NSPasteboard(name: .drag)` gets a new change count each time a drag starts.
     /// Comparing it with the value at mouse-down tells a real file or text drag apart
@@ -22,14 +31,23 @@ final class NotchController: NSObject {
     private var dragChangeCountAtMouseDown = NSPasteboard(name: .drag).changeCount
     private var isDraggingContent = false
 
-    /// Set when the notch is opened from the menu bar icon. It then stays open until
-    /// the cursor has visited it and left, or the user clicks elsewhere.
+    /// Set when the notch is opened from the menu bar icon or a shortcut. It then stays
+    /// open until the cursor has visited it and left, or the user clicks elsewhere.
     private var openedManually = false
     private var cursorVisitedSinceManualOpen = false
 
-    init(clipboard: ClipboardManager, shelf: FileTrayManager) {
+    init(
+        clipboard: ClipboardManager,
+        shelf: FileTrayManager,
+        hud: SystemHUDManager,
+        settings: SettingsStore,
+        openSettings: @escaping () -> Void
+    ) {
         self.clipboard = clipboard
         self.shelf = shelf
+        self.hud = hud
+        self.settings = settings
+        self.openSettings = openSettings
         super.init()
     }
 
@@ -39,10 +57,19 @@ final class NotchController: NSObject {
         guard let screen = NotchGeometry.preferredScreen() else { return }
         viewModel.geometry = NotchGeometry(screen: screen)
 
-        let panel = NotchPanel(contentRect: viewModel.geometry.closedPanelFrame)
+        let panel = NotchPanel(contentRect: viewModel.geometry.closedPanelFrame())
         let container = NotchContainerView(
             frame: NSRect(origin: .zero, size: panel.frame.size),
-            rootView: NotchRootView(viewModel: viewModel, clipboard: clipboard, shelf: shelf)
+            rootView: NotchRootView(
+                viewModel: viewModel,
+                clipboard: clipboard,
+                shelf: shelf,
+                hud: hud,
+                openSettings: { [weak self] in
+                    self?.close()
+                    self?.openSettings()
+                }
+            )
         )
         container.delegate = self
         panel.contentView = container
@@ -50,6 +77,7 @@ final class NotchController: NSObject {
         self.panel = panel
 
         installEventMonitors()
+        observeIndicators()
 
         NotificationCenter.default.addObserver(
             self,
@@ -70,10 +98,12 @@ final class NotchController: NSObject {
             NSEvent.removeMonitor(monitor)
         }
         eventMonitors.removeAll()
+        subscriptions.removeAll()
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
-        closeTask?.cancel()
-        collapseTask?.cancel()
+        for task in [closeTask, collapseTask, indicatorResizeTask, chargingIndicatorTask] {
+            task?.cancel()
+        }
         panel?.orderOut(nil)
     }
 
@@ -83,6 +113,8 @@ final class NotchController: NSObject {
         cancelScheduledClose()
         collapseTask?.cancel()
         collapseTask = nil
+        indicatorResizeTask?.cancel()
+        indicatorResizeTask = nil
 
         if manually {
             openedManually = true
@@ -94,7 +126,9 @@ final class NotchController: NSObject {
         // Grow the window first, then animate the shape inside it. The closed shape
         // stays centred at the top, so it doesn't jump when the window resizes.
         panel.setFrame(viewModel.geometry.openPanelFrame, display: true)
-        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        if settings.hapticsEnabled {
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        }
         viewModel.setState(.open)
     }
 
@@ -111,7 +145,7 @@ final class NotchController: NSObject {
         collapseTask = Task { [weak self] in
             try? await Task.sleep(for: NotchMetrics.collapseDuration)
             guard let self, !Task.isCancelled, !self.viewModel.isOpen, let panel = self.panel else { return }
-            panel.setFrame(self.viewModel.geometry.closedPanelFrame, display: true)
+            panel.setFrame(self.viewModel.geometry.closedPanelFrame(extraWidth: self.viewModel.closedExtraWidth), display: true)
             // If the search field had keyboard focus, typing would keep going to the
             // hidden notch. Re-ordering the window hands focus back to the app underneath.
             if panel.isKeyWindow {
@@ -120,6 +154,23 @@ final class NotchController: NSObject {
                 panel.orderFrontRegardless()
             }
         }
+    }
+
+    /// Keyboard shortcut: open (and stay open) or close.
+    func toggle() {
+        if viewModel.isOpen {
+            close()
+        } else {
+            open(manually: true)
+        }
+    }
+
+    /// Keyboard shortcut: open the clipboard tab with the search field ready for typing.
+    func openClipboardSearch() {
+        viewModel.selectedTab = .clipboard
+        open(manually: true)
+        panel?.makeKey()
+        viewModel.requestSearchFocus()
     }
 
     private func scheduleClose() {
@@ -137,7 +188,76 @@ final class NotchController: NSObject {
         closeTask = nil
     }
 
-    // MARK: - Cursor and drag tracking
+    // MARK: - Closed-notch indicators
+
+    private func observeIndicators() {
+        hud.$microphone
+            .map(\.isActive)
+            .combineLatest(settings.$showMicrophoneIndicator)
+            .map { isActive, isEnabled in isActive && isEnabled }
+            .removeDuplicates()
+            .sink { [weak self] show in
+                MainActor.assumeIsolated {
+                    self?.updateIndicators { $0.showsMicrophoneIndicator = show }
+                }
+            }
+            .store(in: &subscriptions)
+
+        // Show the battery level for a few seconds when the charger is connected.
+        hud.$battery
+            .map(\.isPluggedIn)
+            .removeDuplicates()
+            .dropFirst()
+            .filter { $0 }
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.flashChargingIndicator()
+                }
+            }
+            .store(in: &subscriptions)
+    }
+
+    private func flashChargingIndicator() {
+        guard settings.showChargingIndicator, hud.battery.hasBattery else { return }
+        updateIndicators { $0.chargingIndicatorPercentage = hud.battery.percentage }
+
+        chargingIndicatorTask?.cancel()
+        chargingIndicatorTask = Task { [weak self] in
+            try? await Task.sleep(for: NotchMetrics.chargingIndicatorDuration)
+            guard let self, !Task.isCancelled else { return }
+            self.updateIndicators { $0.chargingIndicatorPercentage = nil }
+        }
+    }
+
+    /// Changes which indicators are showing, resizing the closed window around them.
+    /// The window grows before the shape animates wider, and shrinks after it animates narrower.
+    private func updateIndicators(_ change: (NotchViewModel) -> Void) {
+        let widthBefore = viewModel.closedExtraWidth
+        withAnimation(NotchMetrics.spring) {
+            change(viewModel)
+        }
+        let widthAfter = viewModel.closedExtraWidth
+
+        guard !viewModel.isOpen, collapseTask == nil || collapseTask?.isCancelled == true, let panel else { return }
+        let targetFrame = viewModel.geometry.closedPanelFrame(extraWidth: widthAfter)
+
+        if widthAfter > widthBefore {
+            indicatorResizeTask?.cancel()
+            panel.setFrame(targetFrame, display: true)
+        } else if widthAfter < widthBefore {
+            indicatorResizeTask?.cancel()
+            indicatorResizeTask = Task { [weak self] in
+                try? await Task.sleep(for: NotchMetrics.collapseDuration)
+                guard let self, !Task.isCancelled, !self.viewModel.isOpen else { return }
+                self.panel?.setFrame(
+                    self.viewModel.geometry.closedPanelFrame(extraWidth: self.viewModel.closedExtraWidth),
+                    display: true
+                )
+            }
+        }
+    }
+
+    // MARK: - Cursor, drag and keyboard tracking
 
     private func installEventMonitors() {
         let mouseEvents: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseDown, .leftMouseUp]
@@ -161,19 +281,36 @@ final class NotchController: NSObject {
             eventMonitors.append(local)
         }
 
-        // Escape closes the notch while it has keyboard focus.
+        // Keys while the notch has keyboard focus: Esc closes, ⌘1–⌘3 switch tabs.
         if let keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
-            let escapeKeyCode: UInt16 = 53
-            guard event.keyCode == escapeKeyCode else { return event }
-            let didClose = MainActor.assumeIsolated { () -> Bool in
-                guard let self, self.viewModel.isOpen else { return false }
-                self.close()
-                return true
+            let keyCode = event.keyCode
+            let isCommand = event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
+            let characters = event.charactersIgnoringModifiers
+            let handled = MainActor.assumeIsolated { () -> Bool in
+                self?.handleKey(keyCode: keyCode, isCommand: isCommand, characters: characters) ?? false
             }
-            return didClose ? nil : event
+            return handled ? nil : event
         }) {
             eventMonitors.append(keys)
         }
+    }
+
+    private func handleKey(keyCode: UInt16, isCommand: Bool, characters: String?) -> Bool {
+        guard viewModel.isOpen, panel?.isKeyWindow == true else { return false }
+
+        let escapeKeyCode: UInt16 = 53
+        if keyCode == escapeKeyCode {
+            close()
+            return true
+        }
+        if isCommand, let characters, let number = Int(characters),
+           NotchViewModel.Tab.allCases.indices.contains(number - 1) {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                viewModel.selectedTab = NotchViewModel.Tab.allCases[number - 1]
+            }
+            return true
+        }
+        return false
     }
 
     private func handleMouseEvent(_ event: NSEvent) {
@@ -184,6 +321,11 @@ final class NotchController: NSObject {
             dragChangeCountAtMouseDown = NSPasteboard(name: .drag).changeCount
             if viewModel.isOpen && !viewModel.geometry.openShapeRect.contains(location) {
                 close()
+                return
+            }
+            // Clicking the closed notch always opens it, whether or not hover is on.
+            if !viewModel.isOpen, event.window === panel {
+                open()
                 return
             }
         case .leftMouseDragged:
@@ -203,10 +345,12 @@ final class NotchController: NSObject {
         let geometry = viewModel.geometry
 
         if !viewModel.isOpen {
-            // Don't pop open while the user is dragging a window or selecting text
-            // across the top of the screen. Only real content drags count.
+            // Content drags always open the notch so there is somewhere to drop.
+            // Plain hovering only does when the setting is on. Never pop open while the
+            // user is dragging a window or selecting text across the top of the screen.
             let mouseIsDown = NSEvent.pressedMouseButtons != 0
-            if geometry.hoverZone.contains(location) && (!mouseIsDown || isDraggingContent) {
+            let wantsOpen = isDraggingContent || (settings.openOnHover && !mouseIsDown)
+            if geometry.hoverZone.contains(location) && wantsOpen {
                 if isDraggingContent {
                     viewModel.selectedTab = .shelf
                 }
@@ -224,7 +368,7 @@ final class NotchController: NSObject {
                 cursorVisitedSinceManualOpen = true
             }
         } else if openedManually && !cursorVisitedSinceManualOpen {
-            // Opened from the menu bar and the cursor hasn't come over yet: stay open.
+            // Opened from the menu bar or a shortcut and the cursor hasn't come over yet: stay open.
         } else {
             scheduleClose()
         }
@@ -235,7 +379,9 @@ final class NotchController: NSObject {
     @objc private func screenParametersChanged() {
         guard let screen = NotchGeometry.preferredScreen() else { return }
         viewModel.geometry = NotchGeometry(screen: screen)
-        let frame = viewModel.isOpen ? viewModel.geometry.openPanelFrame : viewModel.geometry.closedPanelFrame
+        let frame = viewModel.isOpen
+            ? viewModel.geometry.openPanelFrame
+            : viewModel.geometry.closedPanelFrame(extraWidth: viewModel.closedExtraWidth)
         panel?.setFrame(frame, display: true)
     }
 
@@ -248,8 +394,8 @@ final class NotchController: NSObject {
 
 extension NotchController: NotchContainerViewDelegate {
     func containerMouseEntered() {
-        // Hovering the notch itself always opens it, even if the cursor jumped straight in.
-        if NSEvent.pressedMouseButtons == 0 {
+        // Hovering the notch itself opens it, even if the cursor jumped straight in.
+        if settings.openOnHover && NSEvent.pressedMouseButtons == 0 {
             open()
         }
     }
