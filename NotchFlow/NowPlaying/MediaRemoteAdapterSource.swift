@@ -71,9 +71,11 @@ final class MediaRemoteAdapterSource {
         let output = Pipe()
         process.standardOutput = output
         let reader = JSONLineReader { [weak self] payload in
+            // Decode here, on the pipe's background queue: artwork arrives as large base64 text.
+            let info = UncheckedInfo(value: Self.info(from: payload))
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    self?.handle(payload)
+                    self?.handle(info.value)
                 }
             }
         }
@@ -112,12 +114,17 @@ final class MediaRemoteAdapterSource {
         }
     }
 
-    private func handle(_ payload: [String: Any]) {
+    private func handle(_ info: NowPlayingInfo?) {
         restartAttempts = 0
-        onUpdate?(Self.info(from: payload))
+        onUpdate?(info)
     }
 
-    private static func info(from payload: [String: Any]) -> NowPlayingInfo? {
+    /// Carries a decoded track (which holds an NSImage) across to the main thread.
+    private struct UncheckedInfo: @unchecked Sendable {
+        let value: NowPlayingInfo?
+    }
+
+    private nonisolated static func info(from payload: [String: Any]) -> NowPlayingInfo? {
         guard let title = payload["title"] as? String, !title.isEmpty else { return nil }
 
         let bundleID = payload["bundleIdentifier"] as? String ?? ""
