@@ -14,6 +14,9 @@ struct NotchGeometry: Equatable {
     /// Whether `notchRect` is a real camera notch.
     let hasNotch: Bool
 
+    /// Whether the open notch has the menu bar drawer row at the bottom.
+    var includesDrawer = false
+
     static let zero = NotchGeometry(screenFrame: .zero, notchRect: .zero, hasNotch: false)
 
     init(screenFrame: NSRect, notchRect: NSRect, hasNotch: Bool) {
@@ -72,7 +75,10 @@ struct NotchGeometry: Equatable {
         )
     }
 
-    var openSize: CGSize { NotchMetrics.openSize }
+    var openSize: CGSize {
+        let base = NotchMetrics.openSize
+        return CGSize(width: base.width, height: base.height + (includesDrawer ? NotchMetrics.drawerHeight : 0))
+    }
 
     // MARK: - Window frames
 

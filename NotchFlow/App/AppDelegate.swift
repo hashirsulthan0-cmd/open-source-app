@@ -12,7 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let shelf = FileTrayManager()
     private let hud = SystemHUDManager()
     private let nowPlaying = NowPlayingManager()
-    private lazy var settingsWindow = SettingsWindowController(settings: settings, clipboard: clipboard)
+    private let scanner = MenuBarScanner()
+    private lazy var settingsWindow = SettingsWindowController(settings: settings, clipboard: clipboard, scanner: scanner)
 
     private var notchController: NotchController?
     private var statusItem: NSStatusItem?
@@ -48,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             shelf: shelf,
             hud: hud,
             nowPlaying: nowPlaying,
+            scanner: scanner,
             settings: settings,
             openSettings: { [weak self] in self?.settingsWindow.show() }
         )

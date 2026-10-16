@@ -12,6 +12,7 @@ final class SettingsStore: ObservableObject {
         static let showNowPlayingIndicator = "showNowPlayingIndicator"
         static let saveClipboardHistory = "saveClipboardHistory"
         static let universalMediaSupport = "universalMediaSupport"
+        static let showMenuBarDrawer = "showMenuBarDrawer"
     }
 
     private let defaults = UserDefaults.standard
@@ -50,6 +51,11 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(universalMediaSupport, forKey: Key.universalMediaSupport) }
     }
 
+    /// Show pinned apps and the menu bar's icons along the bottom of the open notch.
+    @Published var showMenuBarDrawer: Bool {
+        didSet { defaults.set(showMenuBarDrawer, forKey: Key.showMenuBarDrawer) }
+    }
+
     @Published private(set) var launchAtLogin: Bool
     @Published private(set) var launchAtLoginError: String?
 
@@ -62,6 +68,7 @@ final class SettingsStore: ObservableObject {
             Key.showNowPlayingIndicator: true,
             Key.saveClipboardHistory: true,
             Key.universalMediaSupport: false,
+            Key.showMenuBarDrawer: true,
         ])
         openOnHover = defaults.bool(forKey: Key.openOnHover)
         hapticsEnabled = defaults.bool(forKey: Key.hapticsEnabled)
@@ -70,6 +77,7 @@ final class SettingsStore: ObservableObject {
         showNowPlayingIndicator = defaults.bool(forKey: Key.showNowPlayingIndicator)
         saveClipboardHistory = defaults.bool(forKey: Key.saveClipboardHistory)
         universalMediaSupport = defaults.bool(forKey: Key.universalMediaSupport)
+        showMenuBarDrawer = defaults.bool(forKey: Key.showMenuBarDrawer)
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

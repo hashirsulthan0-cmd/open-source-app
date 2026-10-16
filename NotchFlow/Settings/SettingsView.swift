@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
     @ObservedObject var clipboard: ClipboardManager
+    @ObservedObject var scanner: MenuBarScanner
 
     @State private var confirmClear = false
 
@@ -41,6 +42,22 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Menu bar drawer") {
+                Toggle("Show pinned apps and menu bar icons in the notch", isOn: $settings.showMenuBarDrawer)
+                PermissionRow(
+                    title: "Accessibility",
+                    detail: "Lists your menu bar icons and clicks them for you, even ones hidden behind the notch.",
+                    isGranted: scanner.hasAccessibility,
+                    request: scanner.requestAccessibility
+                )
+                PermissionRow(
+                    title: "Screen Recording",
+                    detail: "Optional. Shows the real menu bar icons instead of app icons. Nothing is recorded or saved.",
+                    isGranted: scanner.hasScreenRecording,
+                    request: scanner.requestScreenRecording
+                )
+            }
+
             Section("Clipboard") {
                 Toggle("Save clipboard history", isOn: $settings.saveClipboardHistory)
                 Text("Passwords copied from password managers are never saved. History stays on this Mac.")
@@ -68,6 +85,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { scanner.refresh() }
         .frame(width: 480)
         .fixedSize(horizontal: false, vertical: true)
         .confirmationDialog("Clear clipboard history?", isPresented: $confirmClear) {
@@ -79,6 +97,31 @@ struct SettingsView: View {
             }
         } message: {
             Text("This can’t be undone.")
+        }
+    }
+}
+
+private struct PermissionRow: View {
+    let title: String
+    let detail: String
+    let isGranted: Bool
+    let request: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isGranted {
+                Label("Allowed", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            } else {
+                Button("Allow…", action: request)
+            }
         }
     }
 }

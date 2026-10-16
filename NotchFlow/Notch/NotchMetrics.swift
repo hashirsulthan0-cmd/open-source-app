@@ -8,6 +8,9 @@ enum NotchMetrics {
     /// Size of the expanded notch, including its small top "ears".
     static let openSize = CGSize(width: 620, height: 240)
 
+    /// Extra height of the open notch for the menu bar drawer row.
+    static let drawerHeight: CGFloat = 46
+
     /// Transparent room around the expanded notch so its shadow isn't cut off.
     static let shadowPadding: CGFloat = 24
 

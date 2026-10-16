@@ -8,6 +8,7 @@ struct NotchRootView: View {
     let shelf: FileTrayManager
     let hud: SystemHUDManager
     let nowPlaying: NowPlayingManager
+    let drawer: DrawerContext
     let openSettings: () -> Void
 
     var body: some View {
@@ -25,6 +26,7 @@ struct NotchRootView: View {
                     shelf: shelf,
                     hud: hud,
                     nowPlaying: nowPlaying,
+                    drawer: drawer,
                     openSettings: openSettings
                 )
                 .transition(
@@ -70,6 +72,14 @@ struct NotchRootView: View {
     }
 }
 
+/// What the menu bar drawer needs, bundled so it can be passed down in one piece.
+struct DrawerContext {
+    let scanner: MenuBarScanner
+    let quickLaunch: [QuickLaunchItem]
+    let onQuickLaunch: (QuickLaunchItem) -> Void
+    let onPressItem: (MenuBarItem) -> Void
+}
+
 /// The open notch: a top band split around the camera (tabs on the left, clock and
 /// settings on the right), with the selected tab's content below.
 struct NotchExpandedView: View {
@@ -78,6 +88,7 @@ struct NotchExpandedView: View {
     let shelf: FileTrayManager
     let hud: SystemHUDManager
     let nowPlaying: NowPlayingManager
+    let drawer: DrawerContext
     let openSettings: () -> Void
 
     var body: some View {
@@ -117,6 +128,15 @@ struct NotchExpandedView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .transition(.opacity)
+
+            if geometry.includesDrawer {
+                MenuBarDrawerView(
+                    scanner: drawer.scanner,
+                    quickLaunch: drawer.quickLaunch,
+                    onQuickLaunch: drawer.onQuickLaunch,
+                    onPressItem: drawer.onPressItem
+                )
+            }
         }
         .padding(.horizontal, NotchMetrics.openTopRadius + 14)
         .padding(.bottom, 16)

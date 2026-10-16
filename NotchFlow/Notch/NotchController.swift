@@ -14,6 +14,8 @@ final class NotchController: NSObject {
     private let shelf: FileTrayManager
     private let hud: SystemHUDManager
     private let nowPlaying: NowPlayingManager
+    private let scanner: MenuBarScanner
+    private let quickLaunch = QuickLaunchItem.defaults()
     private let settings: SettingsStore
     private let openSettings: () -> Void
 
@@ -42,6 +44,7 @@ final class NotchController: NSObject {
         shelf: FileTrayManager,
         hud: SystemHUDManager,
         nowPlaying: NowPlayingManager,
+        scanner: MenuBarScanner,
         settings: SettingsStore,
         openSettings: @escaping () -> Void
     ) {
@@ -49,6 +52,7 @@ final class NotchController: NSObject {
         self.shelf = shelf
         self.hud = hud
         self.nowPlaying = nowPlaying
+        self.scanner = scanner
         self.settings = settings
         self.openSettings = openSettings
         super.init()
@@ -69,6 +73,12 @@ final class NotchController: NSObject {
                 shelf: shelf,
                 hud: hud,
                 nowPlaying: nowPlaying,
+                drawer: DrawerContext(
+                    scanner: scanner,
+                    quickLaunch: quickLaunch,
+                    onQuickLaunch: { [weak self] item in self?.launch(item) },
+                    onPressItem: { [weak self] item in self?.press(item) }
+                ),
                 openSettings: { [weak self] in
                     self?.close()
                     self?.openSettings()
@@ -82,6 +92,7 @@ final class NotchController: NSObject {
 
         installEventMonitors()
         observeIndicators()
+        observeDrawerSetting()
 
         NotificationCenter.default.addObserver(
             self,
@@ -134,6 +145,9 @@ final class NotchController: NSObject {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
         viewModel.setState(.open)
+        if viewModel.geometry.includesDrawer {
+            scanner.startLiveUpdates()
+        }
     }
 
     func close() {
@@ -143,6 +157,7 @@ final class NotchController: NSObject {
 
         viewModel.setState(.closed)
         viewModel.isDropTargeted = false
+        scanner.stopLiveUpdates()
 
         // Shrink the window back to notch size once the close animation has played,
         // so the transparent area around it stops covering anything.
@@ -190,6 +205,47 @@ final class NotchController: NSObject {
     private func cancelScheduledClose() {
         closeTask?.cancel()
         closeTask = nil
+    }
+
+    // MARK: - Menu bar drawer
+
+    private func observeDrawerSetting() {
+        settings.$showMenuBarDrawer
+            .removeDuplicates()
+            .sink { [weak self] isOn in
+                MainActor.assumeIsolated {
+                    self?.setDrawerVisible(isOn)
+                }
+            }
+            .store(in: &subscriptions)
+    }
+
+    private func setDrawerVisible(_ isVisible: Bool) {
+        viewModel.geometry.includesDrawer = isVisible
+        if viewModel.isOpen {
+            panel?.setFrame(viewModel.geometry.openPanelFrame, display: true)
+            if isVisible { scanner.startLiveUpdates() } else { scanner.stopLiveUpdates() }
+        }
+    }
+
+    /// The notch sits above the menu bar, so it closes first; otherwise it would cover
+    /// the menu that's about to open.
+    private func press(_ item: MenuBarItem) {
+        close()
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            self?.scanner.press(item)
+        }
+    }
+
+    private func launch(_ item: QuickLaunchItem) {
+        close()
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            if !item.perform() {
+                self?.scanner.requestAccessibility()
+            }
+        }
     }
 
     // MARK: - Closed-notch indicators
@@ -412,7 +468,9 @@ final class NotchController: NSObject {
 
     @objc private func screenParametersChanged() {
         guard let screen = NotchGeometry.preferredScreen() else { return }
-        viewModel.geometry = NotchGeometry(screen: screen)
+        var geometry = NotchGeometry(screen: screen)
+        geometry.includesDrawer = viewModel.geometry.includesDrawer
+        viewModel.geometry = geometry
         let frame = viewModel.isOpen
             ? viewModel.geometry.openPanelFrame
             : viewModel.geometry.closedPanelFrame(extraWidth: viewModel.closedExtraWidth)
