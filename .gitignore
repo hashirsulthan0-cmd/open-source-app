@@ -35,3 +35,4 @@ coverage/
 xcuserdata/
 *.xcuserstate
 DerivedData/
+build.noindex/

@@ -17,7 +17,8 @@ if ! xcodebuild -version >/dev/null 2>&1; then
     export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 fi
 
-BUILD_DIR="$ROOT/build/release"
+# ".noindex" keeps Spotlight and Launchpad from finding (and opening) these test copies.
+BUILD_DIR="$ROOT/build.noindex/release"
 DIST_DIR="$ROOT/dist"
 rm -rf "$BUILD_DIR"
 mkdir -p "$DIST_DIR"
